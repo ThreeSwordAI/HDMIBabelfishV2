@@ -5,11 +5,17 @@
 # bounding box positions and text are printed to the console
 
 import cv2
+import torch
 import pytesseract
 from pytesseract import Output
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from collections import deque
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+import os
+
+#Disable parallelism for CPU mode
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 def calculate_total_bounding_box_percentile(d, draw, image_width, image_height, debug = False):
@@ -79,6 +85,17 @@ def average_bounding_boxes(history):
 
     return avg_x1, avg_y1, avg_x2, avg_y2
 
+
+def add_newline_after_center_word(text):
+    words = text.split()
+    if len(words) <= 1:
+        return text  # No center word if there's one or zero words
+
+    center_index = len(words) // 2
+    # Rebuild the text with a newline after the center word
+    new_text = ' '.join(words[:center_index + 1]) + '\n' + ' '.join(words[center_index + 1:])
+    return new_text
+
 # Initialize video capture
 video_path = 'JapanRPG_TestSequence.mov'
 cap = cv2.VideoCapture(video_path)
@@ -103,6 +120,12 @@ font = ImageFont.truetype(font_path, 20)
 min_box_width = 0
 frame_count = 0
 image_height, image_width = 640, 480
+
+tokenizer = AutoTokenizer.from_pretrained("nllb-200-distilled-600M")
+model = AutoModelForSeq2SeqLM.from_pretrained("nllb-200-distilled-600M")
+
+translator = pipeline('translation', model=model, tokenizer=tokenizer, src_lang='jpn_Jpan', tgt_lang='eng_Latn',
+                      max_length=200)
 
 history = deque(maxlen=10)  # To store the history of bounding boxes
 
@@ -146,12 +169,55 @@ while cap.isOpened():
                 # Second pass: Refined OCR on the ROI
                 refined_text = pytesseract.image_to_string(roi, config=tess_config_refined)
 
-                # Convert OpenCV image to PIL image
-                draw.rectangle([total_x1, total_y1, total_x2, total_y2], outline=(0, 0, 255), width=2)
-                draw.text((total_x1, total_y1 - 10), refined_text, font=font, fill=(0, 255, 0))
+                # Compute the average color in the bounding box
+                avg_color = cv2.mean(image[int(total_y1):int(total_y2), int(total_x1):int(total_x2)])[:3]
+                avg_color = tuple(map(int, avg_color))
+
+                # Set the entire bounding box to the average color
+                image[int(total_y1):int(total_y2), int(total_x1):int(total_x2)] = avg_color
+
+                #Convert to PIL Image
+                image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                draw = ImageDraw.Draw(image_pil)
 
                 # Display the refined text
                 print(f"Refined Text: {refined_text}")
+
+                # Translate and print
+                translation = translator(refined_text)[0]
+                trans_text = add_newline_after_center_word(translation['translation_text'])
+                print(f"Translated Text: {trans_text}")
+
+                # Calculate the bounding box size
+                bbox_width = total_x2 - total_x1
+                bbox_height = total_y2 - total_y1
+
+                # Find the appropriate font size that fits the bounding box
+                font_size = 20
+                font = ImageFont.truetype(font_path, font_size)
+                error = False
+                while True:
+                    try:
+                        text_bbox = font.getbbox(trans_text)
+                    except ValueError:
+                        error = True
+                        break
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                    if text_width < bbox_width and text_height < bbox_height:
+                        font_size += 1
+                        font = ImageFont.truetype(font_path, font_size)
+                    else:
+                        font_size -= 1
+                        font = ImageFont.truetype(font_path, font_size)
+                        break
+
+                # Draw the translated text
+                if not error:
+                    draw.text((total_x1, total_y1), trans_text, font=font, fill=(255, 255, 255))
+
+                # Convert back to OpenCV format
+                image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
 
         # Convert PIL image back to OpenCV format
         image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
@@ -170,5 +236,3 @@ while cap.isOpened():
 # Release the video capture object
 cap.release()
 cv2.destroyAllWindows()
-
-
