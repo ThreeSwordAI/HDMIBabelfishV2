@@ -1,5 +1,23 @@
+__pycache__/
+*.py[cod]
+
 # Virtual environment
 venv/
 
 # Datasets
-Data/
+data/
+
+# Logs and model checkpoints that may be large or regenerated
+*.pt
+*.yaml
+logs/
+# Optionally ignore the entire experiments folder if desired
+# experiments/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# GPU testing files
+gpu_testing.py
+
