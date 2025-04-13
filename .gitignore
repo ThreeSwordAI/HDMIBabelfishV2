@@ -21,3 +21,7 @@ Thumbs.db
 # GPU testing files
 gpu_testing.py
 
+#prediction videos
+*.avi
+*.mp4
+*.mov
