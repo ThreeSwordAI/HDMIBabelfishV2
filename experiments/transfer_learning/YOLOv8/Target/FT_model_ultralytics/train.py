@@ -3,6 +3,7 @@ import time
 import random
 import cv2
 import csv
+import shutil
 import numpy as np
 from ultralytics import YOLO
 from multiprocessing import freeze_support
@@ -88,6 +89,26 @@ def save_prediction_images(model, test_dir, prediction_dir, count=15):
     print(f"Running predictions on {count} random images and saving to: {prediction_dir}")
     model.predict(source=sampled_images, imgsz=640, conf=0.25, save=True, project=prediction_dir, name="predictions", exist_ok=True)
 
+def create_val_split(train_dir, val_dir, split_ratio=0.2):
+    if not os.path.exists(val_dir):
+        os.makedirs(val_dir)
+
+    image_files = [f for f in os.listdir(train_dir) if f.lower().endswith('.jpg')]
+    num_val = int(len(image_files) * split_ratio)
+    val_images = random.sample(image_files, num_val)
+    for img in val_images:
+        src_img = os.path.join(train_dir, img)
+        dst_img = os.path.join(val_dir, img)
+        shutil.copy(src_img, dst_img)
+
+        label_file = img.replace('.jpg', '.txt')
+        src_label = os.path.join(train_dir, label_file)
+        if os.path.exists(src_label):
+            dst_label = os.path.join(val_dir, label_file)
+            shutil.copy(src_label, dst_label)
+    print(f"Created validation split in: {val_dir} ({num_val} images)")
+
+
 # ------------------------------------------------------------------------------
 # Main Execution Function
 # ------------------------------------------------------------------------------
@@ -95,17 +116,22 @@ def main():
     base_dataset = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset"
     train_dir = os.path.join(base_dataset, "train")
     test_dir = os.path.join(base_dataset, "test")
+    val_dir = os.path.join(base_dataset, "val")
     
-    print("Remapping label files in train and test directories...")
+
+    print("Remapping label files in train directory...")
     remap_labels(train_dir)
-    remap_labels(test_dir)
+
+    create_val_split(train_dir, val_dir, split_ratio=0.2)
     
+
     dataset_yaml_content = f"""
                             train: {train_dir}
-                            val: {test_dir}
+                            val: {val_dir}
                             nc: 1
                             names: ['text-box']
                             """
+                            
     dataset_yaml_path = os.path.join(base_dataset, "dataset.yaml")
     with open(dataset_yaml_path, 'w') as f:
         f.write(dataset_yaml_content)
