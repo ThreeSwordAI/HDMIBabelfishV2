@@ -1,58 +1,51 @@
 import os
 import time
 import random
-import xml.etree.ElementTree as ET
+import shutil
 import cv2
 import csv
 import numpy as np
 from ultralytics import YOLO
 from multiprocessing import freeze_support
 
-# ------------------------------------------------------------------------------
-# Part 1: Convert Pascal VOC (XML) Annotations to YOLO Format
-# ------------------------------------------------------------------------------
-def convert_voc_to_yolo(ann_dir, img_dir):
-    for ann in os.listdir(ann_dir):
-        if not ann.endswith('.xml'):
-            continue
-        image_file = ann.replace('.xml', '.jpg')
-        image_path = os.path.join(img_dir, image_file)
-        if not os.path.exists(image_path):
-            # Skip if the image file is missing.
-            continue
-        xml_path = os.path.join(ann_dir, ann)
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
+
+def remap_labels(label_dir):
+    for fname in os.listdir(label_dir):
+        if fname.lower().endswith('.txt') and fname != "classes.txt":
+            file_path = os.path.join(label_dir, fname)
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+            new_lines = []
+            for line in lines:
+                parts = line.strip().split()
+                if len(parts) < 5:
+                    continue
+                parts[0] = "0"
+                new_lines.append(" ".join(parts))
+            with open(file_path, 'w') as f:
+                f.write("\n".join(new_lines))
 
 
-        size = root.find('size')
-        img_width = int(size.find('width').text)
-        img_height = int(size.find('height').text)
+def create_val_split(train_dir, val_dir, split_ratio=0.2):
+    if not os.path.exists(val_dir):
+        os.makedirs(val_dir)
+    image_files = [f for f in os.listdir(train_dir) if f.lower().endswith('.jpg')]
+    num_val = int(len(image_files) * split_ratio)
+    val_images = random.sample(image_files, num_val)
+    for img in val_images:
+        src_img = os.path.join(train_dir, img)
+        dst_img = os.path.join(val_dir, img)
+        shutil.copy(src_img, dst_img)
+        label_file = img.replace('.jpg', '.txt')
+        src_label = os.path.join(train_dir, label_file)
+        if os.path.exists(src_label):
+            dst_label = os.path.join(val_dir, label_file)
+            shutil.copy(src_label, dst_label)
+    print(f"Created validation split: {num_val} images copied to {val_dir}")
 
-
-        txt_file = os.path.join(ann_dir, ann.replace('.xml', '.txt'))
-        lines = []
-        for obj in root.findall('object'):
-            cls = 0
-            bndbox = obj.find('bndbox')
-            xmin = float(bndbox.find('xmin').text)
-            ymin = float(bndbox.find('ymin').text)
-            xmax = float(bndbox.find('xmax').text)
-            ymax = float(bndbox.find('ymax').text)
-            # Convert to YOLO normalized coordinates.
-            x_center = ((xmin + xmax) / 2.0) / img_width
-            y_center = ((ymin + ymax) / 2.0) / img_height
-            box_width = (xmax - xmin) / img_width
-            box_height = (ymax - ymin) / img_height
-            line = f"{cls} {x_center:.6f} {y_center:.6f} {box_width:.6f} {box_height:.6f}"
-            lines.append(line)
-        with open(txt_file, 'w') as f:
-            f.write("\n".join(lines))
-
-
-# ------------------------------------------------------------------------------
-# Part 2: Compute Intersection over Union (IoU)
-# ------------------------------------------------------------------------------
+# -------------------------------
+# Function to compute Intersection over Union (IoU)
+# -------------------------------
 def compute_iou(box1, box2):
     xA = max(box1[0], box2[0])
     yA = max(box1[1], box2[1])
@@ -63,105 +56,107 @@ def compute_iou(box1, box2):
     boxBArea = (box2[2] - box2[0] + 1) * (box2[3] - box2[1] + 1)
     return interArea / float(boxAArea + boxBArea - interArea)
 
-
-# ------------------------------------------------------------------------------
-# Part 3: Evaluate the YOLOv8 Model on Test Data
-# ------------------------------------------------------------------------------
+# -------------------------------
+# Evaluation function using YOLO .txt labels (YOLO format)
+# -------------------------------
 def evaluate_model(model, test_dir):
     results = []
     for file in os.listdir(test_dir):
-        if file.endswith('.jpg'):
+        if file.lower().endswith('.jpg'):
             image_path = os.path.join(test_dir, file)
-            xml_path = os.path.join(test_dir, file.replace('.jpg', '.xml'))
-            if not os.path.exists(xml_path):
-                continue  # Skip if XML is missing.
+            label_path = os.path.join(test_dir, file.replace('.jpg', '.txt'))
+            if not os.path.exists(label_path):
+                continue
             image = cv2.imread(image_path)
             if image is None:
                 continue
-
-
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
-            gt_box = None
-            for obj in root.findall('object'):
-                bndbox = obj.find('bndbox')
-                xmin = int(bndbox.find('xmin').text)
-                ymin = int(bndbox.find('ymin').text)
-                xmax = int(bndbox.find('xmax').text)
-                ymax = int(bndbox.find('ymax').text)
-                gt_box = [xmin, ymin, xmax, ymax]
-                break
-            if gt_box is None:
+            h, w, _ = image.shape
+            
+            with open(label_path, 'r') as f:
+                lines = f.readlines()
+            if not lines:
                 continue
-
-            start_time = time.time()
+            parts = lines[0].strip().split()
+            if len(parts) < 5:
+                continue
+            
+            # Convert YOLO normalized format to absolute pixel coordinates
+            x_center = float(parts[1]) * w
+            y_center = float(parts[2]) * h
+            box_w = float(parts[3]) * w
+            box_h = float(parts[4]) * h
+            gt_box = [
+                int(x_center - box_w/2),
+                int(y_center - box_h/2),
+                int(x_center + box_w/2),
+                int(y_center + box_h/2)
+            ]
+            
+            start = time.time()
             pred_results = model.predict(source=image, imgsz=640, conf=0.25)
-            inference_time = time.time() - start_time
-
-
+            inference_time = time.time() - start
+            
             pred_box = [0, 0, 0, 0]
-            if len(pred_results) > 0 and len(pred_results[0].boxes) > 0:
+            if pred_results and pred_results[0].boxes and len(pred_results[0].boxes) > 0:
                 box_tensor = pred_results[0].boxes.xyxy[0].cpu().numpy()
                 pred_box = [int(x) for x in box_tensor]
             iou = compute_iou(pred_box, gt_box)
             results.append({'image': file, 'avg_iou': iou, 'inference_time': inference_time})
     return results
 
-
-# ------------------------------------------------------------------------------
-# Part 4: Save Prediction Images for a Random Sample of Test Data
-# ------------------------------------------------------------------------------
+# -------------------------------
+# Function to save random prediction images
+# -------------------------------
 def save_prediction_images(model, test_dir, prediction_dir, count=15):
     image_files = [os.path.join(test_dir, f) for f in os.listdir(test_dir) if f.lower().endswith('.jpg')]
     if len(image_files) < count:
         count = len(image_files)
     sampled_images = random.sample(image_files, count)
-    
     print(f"Running predictions on {count} random images and saving to: {prediction_dir}")
     model.predict(source=sampled_images, imgsz=640, conf=0.25, save=True, project=prediction_dir, name="predictions", exist_ok=True)
 
-
-# ------------------------------------------------------------------------------
+# -------------------------------
 # Main Execution Function
-# ------------------------------------------------------------------------------
+# -------------------------------
 def main():
-    train_dir = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset\train"
-    test_dir  = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset\test"
-    val_dir  = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset\val"
-    prediction_dir = r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv8"
+    base_dataset = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset"
+    train_dir = os.path.join(base_dataset, "train")
+    test_dir = os.path.join(base_dataset, "test")
+    val_dir = os.path.join(base_dataset, "val")
     
-    print("Converting VOC annotations to YOLO format for training data...")
-    convert_voc_to_yolo(train_dir, train_dir)
-    print("Converting VOC annotations to YOLO format for test data...")
-    convert_voc_to_yolo(test_dir, test_dir)
+    # Remap labels in train (and optionally in test, if needed)
+    #print("Remapping label files in train directory...")
+    #remap_labels(train_dir)
+    #create_val_split(train_dir, val_dir, split_ratio=0.2)
     
+
     dataset_yaml_content = f"""
                             train: {train_dir}
                             val: {val_dir}
                             nc: 1
-                            names: ['license-plate']
+                            names: ['text-box']
                             """
-    dataset_yaml_path = r"F:\FAU\Thesis\HDMIBabelfishV2\data\game_review\big_dataset\dataset.yaml"
+    dataset_yaml_path = os.path.join(base_dataset, "dataset.yaml")
     with open(dataset_yaml_path, 'w') as f:
         f.write(dataset_yaml_content)
     print(f"Dataset YAML file created at: {dataset_yaml_path}")
     
-    # Load a pretrained YOLOv8 model.
-    # model = YOLO('yolov8s.pt')
-    # Uncomment the following line to train from scratch:
+    # -----------------------------
+    # Load the YOLO model from scratch (random initialization)
+    # -----------------------------
     model = YOLO('yolov8s.yaml')
-
-    print("Starting training...")
-    model.train(data=dataset_yaml_path, epochs=30, imgsz=640, batch=16)
     
-    export_dir = r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv8"
-    export_result = model.export(format="torchscript", save_dir=export_dir)
+    print("Starting training on target dataset from scratch...")
+    model.train(data=dataset_yaml_path, epochs=10, imgsz=640, batch=16)
+    
+
+    target_dir = r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv8"
+    export_result = model.export(format="torchscript", save_dir=target_dir)
     print(f"Training complete. Exported model details:\n{export_result}")
     
     print("Starting evaluation on test dataset...")
     eval_results = evaluate_model(model, test_dir)
-    
-    results_csv = r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv8\evaluation_results.csv"
+    results_csv = os.path.join(target_dir, "evaluation_results.csv")
     with open(results_csv, 'w', newline='') as csvfile:
         fieldnames = ['image', 'avg_iou', 'inference_time']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -170,9 +165,9 @@ def main():
             writer.writerow(res)
     print(f"Evaluation complete. Results saved in: {results_csv}")
     
+    prediction_dir = os.path.join(target_dir, "predictions")
     save_prediction_images(model, test_dir, prediction_dir, count=15)
     print("Prediction images saved.")
-
 
 if __name__ == '__main__':
     freeze_support()
