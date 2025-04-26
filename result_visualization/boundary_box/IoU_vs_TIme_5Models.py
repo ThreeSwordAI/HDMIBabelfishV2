@@ -23,7 +23,17 @@ csv_files = [
     {
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv8\Target\FT_model_ultralytics\evaluation_results.csv",
         "model": "YOLOv8 FT Ultralytics"
+    },
+    
+    {
+        "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv8\Target\FT_model_ultralytics_nano\evaluation_results.csv",
+        "model": "YOLOv8 FT Ultralytics Nano"
+    },
+    {
+        "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv11\Target\FT_model_ultralytics_nano\evaluation_results.csv",
+        "model": "YOLOv11 FT Ultralytics Nano"
     }
+    
 ]
 
 

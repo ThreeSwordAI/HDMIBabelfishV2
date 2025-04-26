@@ -27,6 +27,7 @@ tess_config = '--psm 6'
 # Font file (using a Windows font that supports Japanese; adjust if necessary)
 font_path = r"C:\Windows\Fonts\msgothic.ttc"
 
+
 # Translation pipeline using the Facebook NLLB-200 distilled model
 translator_model_id = "facebook/nllb-200-distilled-600M"
 tokenizer = AutoTokenizer.from_pretrained(translator_model_id)
