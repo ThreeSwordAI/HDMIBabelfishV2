@@ -9,6 +9,10 @@ csv_files = [
         "model": "YOLOv8 Scratch"
     },
     {
+        "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv11\evaluation_results.csv",
+        "model": "YOLOv11 Scratch"
+    },
+    {
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv5\Target\FT_model_Scratch\evaluation_results.csv",
         "model": "YOLOv5 FT (Scratch)"
     },
