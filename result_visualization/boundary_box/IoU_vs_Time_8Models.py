@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 
 csv_files = [
     {
+        "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv5\Source\Scratch_model\evaluation_results.csv",
+        "model": "YOLOv5 Scratch"
+    },
+    {
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv8\evaluation_results.csv",
         "model": "YOLOv8 Scratch"
     },
@@ -12,9 +16,10 @@ csv_files = [
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\scratch\YOLOv11_nano\evaluation_results.csv",
         "model": "YOLOv11 Nano Scratch"
     },
+    
     {
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv5\Target\FT_model_Scratch\evaluation_results.csv",
-        "model": "YOLOv5 FT (Scratch)"
+        "model": "YOLOv5 FT on Scratch"
     },
     {
         "path": r"F:\FAU\Thesis\HDMIBabelfishV2\experiments\transfer_learning\YOLOv8\Target\FT_model_CarLicense\evaluation_results.csv",
