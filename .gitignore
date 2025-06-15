@@ -28,3 +28,6 @@ gpu_testing.py
 
 packages/
 experiments/scratch/YOLOv11_nano/sort.py
+
+jetson/models/
+jetson/output/
