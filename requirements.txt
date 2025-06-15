@@ -1,0 +1,6 @@
+ultralytics
+pyyaml
+opencv-python
+#torch
+#torchvision
+#torchaudio --index-url https://download.pytorch.org/whl/cu126

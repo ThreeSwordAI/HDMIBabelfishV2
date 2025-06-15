@@ -1,0 +1,7 @@
+Total frames processed: 10356
+Total run time (s): 1122.43
+Average FPS: 9.23
+Average CPU usage (%): 23.01
+Average RAM usage (%): 75.20
+Average GPU load (%): 23.85
+Average GPU memory (%): 91.78
