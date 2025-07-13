@@ -31,3 +31,5 @@ experiments/scratch/YOLOv11_nano/sort.py
 
 jetson/models/
 jetson/output/
+
+translation/models/
