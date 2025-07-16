@@ -29,11 +29,10 @@ import matplotlib.pyplot as plt
 
 # -------- CONFIG --------
 # Video source options:
-# Option 1: HDMI Capture (HD60 S+ - RECOMMENDED FOR PS3)
-USE_HD60S_CAPTURE = True      # Set to True when using HD60 S+ 
-HD60S_DEVICE_ID = 1          # Device ID from your simple test (usually 1 or 2)
-HD60S_RESOLUTION = (1920, 1080)  # HD60 S+ resolution
-HD60S_FPS = 30               # Capture FPS for USB 2.0
+# Option 1: USB Capture Device (Stream Link or similar)
+CAPTURE_DEVICE_ID = 1        # Try 0, 1, 2, etc. to find your Stream Link device
+CAPTURE_RESOLUTION = (1920, 1080)  # Adjust based on your capture device capability
+CAPTURE_FPS = 30             # Target capture FPS
 
 # Option 2: File input (for testing)
 VIDEO_PATH = "../data/test_video/JapanRPG_TestSequence.mov"
@@ -41,11 +40,14 @@ VIDEO_PATH = "../data/test_video/JapanRPG_TestSequence.mov"
 # Option 3: Webcam (fallback)
 # VIDEO_PATH = 0  # Default camera
 
+# Capture device preference (set to True to use USB capture, False for file input)
+USE_CAPTURE_DEVICE = True
+
 MODEL_PATH = "../experiments/scratch/YOLOv11_nano/runs/detect/train/weights/best.pt"  # YOLO model path
 MARIAN_MODEL_PATH = "../translation/models/marian_opus_ja_en"  # Path to translation model
-WINDOW_NAME = "PS3 Real-Time Translation - HD60 S+"
-TARGET_FPS = 25  # Slightly lower for USB 2.0 stability
-STABILITY_MS = 400  # Slightly higher for better text stability
+WINDOW_NAME = "PS3 Real-Time Translation - Stream Link Capture"
+TARGET_FPS = 25              # Processing FPS
+STABILITY_MS = 400           # Text stability time in milliseconds
 
 BASE_DIR = "output/video"
 OUTPUT_VIDEO = os.path.join(BASE_DIR, "output_cuda_marian.mp4")
@@ -216,6 +218,58 @@ def get_translation(text):
         return f"[No translator: {text}]"
     return translator_model.translate(text)
 
+def wrap_text_in_box(text, box_width, box_height, font_scale=0.8, thickness=2):
+    """
+    Wrap text to fit within a bounding box, returning lines and optimal font size
+    """
+    words = text.split()
+    if not words:
+        return [], font_scale
+    
+    lines = []
+    current_line = []
+    
+    # Start with the given font scale and reduce if needed
+    current_font_scale = font_scale
+    
+    while current_font_scale > 0.3:  # Minimum readable font size
+        lines = []
+        current_line = []
+        
+        for word in words:
+            # Test if adding this word would exceed box width
+            test_line = ' '.join(current_line + [word])
+            text_size = cv2.getTextSize(test_line, cv2.FONT_HERSHEY_SIMPLEX, 
+                                       current_font_scale, thickness)[0]
+            
+            if text_size[0] <= box_width - 8:  # 8px padding
+                current_line.append(word)
+            else:
+                # Current line is full, start a new one
+                if current_line:
+                    lines.append(' '.join(current_line))
+                    current_line = [word]
+                else:
+                    # Single word is too long, break it
+                    lines.append(word)
+        
+        # Add the last line
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        # Check if all lines fit within box height
+        line_height = cv2.getTextSize("Ay", cv2.FONT_HERSHEY_SIMPLEX, 
+                                     current_font_scale, thickness)[0][1] + 4
+        total_height = len(lines) * line_height
+        
+        if total_height <= box_height - 8:  # 8px padding
+            break
+        
+        # Reduce font size and try again
+        current_font_scale -= 0.1
+    
+    return lines, current_font_scale
+
 # Initialize everything BEFORE starting video processing
 print("STEP 1: Loading YOLO model...")
 
@@ -383,39 +437,60 @@ def ocr_worker(worker_id):
             
         ocr_q.task_done()
 
-# Main display loop with CUDA optimizations
-def setup_hd60s_capture():
-    """Setup HD60 S+ capture with DirectShow backend"""
-    print("🎮 Setting up HD60 S+ capture for PS3...")
-    print(f"   Device ID: {HD60S_DEVICE_ID}")
-    print(f"   Target Resolution: {HD60S_RESOLUTION}")
-    print(f"   Target FPS: {HD60S_FPS}")
+def setup_capture_device():
+    """Setup USB capture device (Stream Link or similar)"""
+    print("🎮 Setting up USB capture device...")
+    print(f"   Device ID: {CAPTURE_DEVICE_ID}")
+    print(f"   Target Resolution: {CAPTURE_RESOLUTION}")
+    print(f"   Target FPS: {CAPTURE_FPS}")
     
-    # Use DirectShow backend (essential for HD60 S+ on Windows)
-    cap = cv2.VideoCapture(HD60S_DEVICE_ID, cv2.CAP_DSHOW)
+    # Try different backends for better compatibility
+    backends = [cv2.CAP_DSHOW, cv2.CAP_V4L2, cv2.CAP_ANY]
+    cap = None
     
-    if not cap.isOpened():
-        print(f"❌ Could not open HD60 S+ on device {HD60S_DEVICE_ID}")
+    for backend in backends:
+        try:
+            print(f"🔧 Trying backend: {backend}")
+            cap = cv2.VideoCapture(CAPTURE_DEVICE_ID, backend)
+            
+            if cap.isOpened():
+                print(f"✅ Opened capture device with backend {backend}")
+                break
+            else:
+                cap.release()
+                cap = None
+        except Exception as e:
+            print(f"⚠ Backend {backend} failed: {e}")
+            continue
+    
+    if cap is None or not cap.isOpened():
+        print(f"❌ Could not open capture device {CAPTURE_DEVICE_ID}")
         print("💡 Solutions:")
-        print("   1. Close Elgato Game Capture software")
-        print("   2. Try different device ID (1, 2, 3)")
-        print("   3. Check USB connection")
+        print("   1. Check if Stream Link is connected and powered")
+        print("   2. Try different device IDs (0, 1, 2, 3)")
+        print("   3. Close any other software using the capture device")
+        print("   4. Check USB connection")
         return None
     
-    # Configure HD60 S+ settings
-    print("🔧 Configuring HD60 S+ settings...")
+    # Configure capture settings
+    print("🔧 Configuring capture device settings...")
     
-    # Set resolution (USB 2.0 optimized)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, HD60S_RESOLUTION[0])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HD60S_RESOLUTION[1])
-    cap.set(cv2.CAP_PROP_FPS, HD60S_FPS)
+    # Set resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAPTURE_RESOLUTION[0])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAPTURE_RESOLUTION[1])
+    cap.set(cv2.CAP_PROP_FPS, CAPTURE_FPS)
     
     # Optimize for gaming capture
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize latency
-    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Disable auto-exposure
-    cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)  # Disable autofocus
     
-    # Try to set MJPG codec for better USB 2.0 performance
+    # Try to disable auto-adjustments for stable gaming capture
+    try:
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Disable auto-exposure
+        cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)  # Disable autofocus
+    except:
+        print("⚠ Could not disable auto-adjustments")
+    
+    # Try to set codec for better performance
     try:
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
         print("✅ Using MJPG codec")
@@ -427,32 +502,32 @@ def setup_hd60s_capture():
     actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     actual_fps = cap.get(cv2.CAP_PROP_FPS)
     
-    print(f"✅ HD60 S+ configured:")
+    print(f"✅ Capture device configured:")
     print(f"   Resolution: {actual_width}x{actual_height}")
     print(f"   FPS: {actual_fps}")
     
     # Test frame capture
     ret, test_frame = cap.read()
     if not ret or test_frame is None:
-        print("❌ Could not capture test frame from HD60 S+")
+        print("❌ Could not capture test frame from device")
         cap.release()
         return None
     
-    print(f"✅ HD60 S+ test frame: {test_frame.shape}")
-    print("✅ HD60 S+ ready for PS3 capture!")
+    print(f"✅ Test frame captured: {test_frame.shape}")
+    print("✅ Capture device ready for PS3!")
     
     return cap
 
 def setup_video_source():
-    """Setup video source with HD60 S+ priority"""
+    """Setup video source with USB capture device priority"""
     
-    if USE_HD60S_CAPTURE:
-        print("🎮 Using HD60 S+ for PS3 capture")
-        cap = setup_hd60s_capture()
+    if USE_CAPTURE_DEVICE:
+        print("🎮 Using USB capture device")
+        cap = setup_capture_device()
         if cap is not None:
             return cap
         else:
-            print("⚠ HD60 S+ setup failed, falling back to file input")
+            print("⚠ USB capture setup failed, falling back to file input")
     
     # Fallback to file input
     print("📁 Using file input as fallback")
@@ -550,29 +625,53 @@ def run():
                 if tid not in active_tids:
                     overlay_states.pop(tid, None)
                     
-        # draw overlays with better styling
+        # draw overlays with improved text wrapping
         overlay_count = 0
         with overlay_lock:
             for tid, data in overlay_states.items():
-                x1,y1,x2,y2 = data['box']
+                x1, y1, x2, y2 = data['box']
                 avg = data['avg']
-                # Better overlay styling
+                text = data['text']
+                
+                # Calculate box dimensions
+                box_width = x2 - x1
+                box_height = y2 - y1
+                
+                # Create semi-transparent overlay
                 overlay = frame.copy()
-                cv2.rectangle(overlay, (x1,y1), (x2,y2), avg, -1)
+                cv2.rectangle(overlay, (x1, y1), (x2, y2), avg, -1)
                 frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
                 
-                # Better text rendering
-                text = data['text']
-                font_scale = 0.8
-                thickness = 2
+                # Wrap text to fit within the box
+                lines, font_scale = wrap_text_in_box(text, box_width, box_height)
                 
-                # Text background for better readability
-                text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
-                cv2.rectangle(frame, (x1, y2-text_size[1]-8), (x1+text_size[0]+8, y2), (0,0,0), -1)
+                # Calculate line height
+                line_height = cv2.getTextSize("Ay", cv2.FONT_HERSHEY_SIMPLEX, 
+                                             font_scale, 2)[0][1] + 4
                 
-                cv2.putText(frame, text, (x1+4, y2-4),
-                            cv2.FONT_HERSHEY_SIMPLEX, font_scale,
-                            (255,255,255), thickness, cv2.LINE_AA)
+                # Draw each line of text
+                for i, line in enumerate(lines):
+                    text_y = y1 + 4 + line_height * (i + 1)
+                    
+                    # Make sure we don't go outside the box
+                    if text_y > y2 - 4:
+                        break
+                    
+                    # Draw text with black background for better readability
+                    text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 
+                                               font_scale, 2)[0]
+                    
+                    # Black background rectangle for text
+                    cv2.rectangle(frame, 
+                                (x1 + 4, text_y - text_size[1] - 2), 
+                                (x1 + 4 + text_size[0], text_y + 2), 
+                                (0, 0, 0), -1)
+                    
+                    # White text
+                    cv2.putText(frame, line, (x1 + 4, text_y),
+                               cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                               (255, 255, 255), 2, cv2.LINE_AA)
+                
                 overlay_count += 1
                             
         # compute & display FPS
@@ -582,41 +681,20 @@ def run():
         fps_list.append(fps_disp)
         time_list.append(now-start_time)
         
-        # Enhanced HUD for PS3 gaming
+        # Enhanced HUD
         cv2.putText(frame, f"FPS: {fps_disp:.1f}", (10,30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
         cv2.putText(frame, f"Translations: {overlay_count}", (10,70),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,255), 2)
-        cv2.putText(frame, f"HD60 S+ PS3 Capture", (10,110),
+        cv2.putText(frame, f"Stream Link Capture", (10,110),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,0), 2)
         cv2.putText(frame, f"Device: {device}", (10,150),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,0), 2)
         
-        # USB connection info
-        if USE_HD60S_CAPTURE:
-            cv2.putText(frame, f"USB 2.0 Mode", (10,190),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
-        
         if torch.cuda.is_available():
             memory_used = torch.cuda.memory_allocated() / 1024**3
-            cv2.putText(frame, f"GPU Memory: {memory_used:.1f}GB", (10,230),
+            cv2.putText(frame, f"GPU Memory: {memory_used:.1f}GB", (10,190),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,255), 2)
-        
-        # Gaming region indicators (helpful for debugging)
-        if overlay_count == 0:  # Only show when no translations active
-            height, width = frame.shape[:2]
-            
-            # Subtitle region indicator
-            subtitle_y = int(height * 0.75)
-            cv2.line(frame, (0, subtitle_y), (width, subtitle_y), (0, 255, 0), 1)
-            cv2.putText(frame, "Subtitle Zone", (width - 150, subtitle_y + 20),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-            
-            # UI region indicator  
-            ui_y = int(height * 0.2)
-            cv2.line(frame, (0, ui_y), (width, ui_y), (255, 0, 0), 1)
-            cv2.putText(frame, "UI Zone", (width - 100, ui_y - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
         
         last = now
         # show
@@ -626,7 +704,7 @@ def run():
             print("👤 User quit")
             break
         
-        # More precise timing for CUDA
+        # More precise timing
         target_time = 1.0/TARGET_FPS
         elapsed = time.time() - now
         if elapsed < target_time:
