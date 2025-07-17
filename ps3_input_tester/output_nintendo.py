@@ -45,7 +45,7 @@ MODEL_PATH = "../experiments/scratch/YOLOv11_nano/runs/detect/train/weights/best
 MARIAN_MODEL_PATH = "../translation/models/marian_opus_ja_en"  # Path to translation model
 WINDOW_NAME = "Nintendo Switch Real-Time Translation - HD60 S+"
 TARGET_FPS = 25  # Optimized for Nintendo Switch
-STABILITY_MS = 400  # Text stability detection time
+STABILITY_MS = 800  # INCREASED from 400ms - Fix for issue 2
 
 BASE_DIR = "output/video"
 OUTPUT_VIDEO = os.path.join(BASE_DIR, "nintendo_switch_translation.mp4")
@@ -161,7 +161,7 @@ class CUDAMarianTranslator:
             # Generate with optimizations
             with torch.no_grad():
                 if self.device.type == "cuda":
-                    with torch.cuda.amp.autocast():  # Mixed precision
+                    with torch.amp.autocast('cuda'):  # FIXED deprecation warning
                         generated_tokens = self.model.generate(
                             **inputs,
                             max_length=max_length,
@@ -215,6 +215,149 @@ def get_translation(text):
     if translator_model is None:
         return f"[No translator: {text}]"
     return translator_model.translate(text)
+
+def calculate_text_similarity(text1, text2):
+    """Calculate similarity between two texts - Fix for issue 2"""
+    if not text1 or not text2:
+        return 0.0
+    
+    # Remove spaces and normalize
+    text1 = text1.replace(' ', '').replace('\n', '').replace('-', '').replace('_', '').replace('*', '')
+    text2 = text2.replace(' ', '').replace('\n', '').replace('-', '').replace('_', '').replace('*', '')
+    
+    if text1 == text2:
+        return 1.0
+    
+    # Calculate character-level similarity
+    longer = max(len(text1), len(text2))
+    if longer == 0:
+        return 1.0
+    
+    # Count matching characters at same positions
+    matches = sum(1 for i in range(min(len(text1), len(text2))) if text1[i] == text2[i])
+    
+    # Add bonus for similar length
+    length_similarity = 1.0 - abs(len(text1) - len(text2)) / longer
+    
+    # Combine position matches with length similarity
+    similarity = (matches / longer) * 0.7 + length_similarity * 0.3
+    
+    return similarity
+
+def wrap_text_to_fit_box(text, box_width, font_scale=0.8, thickness=2):
+    """Wrap text to fit within the detection box width - Fix for issue 1"""
+    if not text:
+        return []
+    
+    # Calculate character width for the font
+    char_size = cv2.getTextSize("A", cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+    char_width = char_size[0]
+    
+    # Calculate how many characters can fit in the box width (with some padding)
+    usable_width = box_width - 16  # 8px padding on each side
+    chars_per_line = max(1, int(usable_width / char_width))
+    
+    # Split text into words
+    words = text.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        # Check if adding this word would exceed the line length
+        test_line = current_line + (" " if current_line else "") + word
+        
+        if len(test_line) <= chars_per_line:
+            current_line = test_line
+        else:
+            # Current line is full, start a new line
+            if current_line:
+                lines.append(current_line)
+            
+            # If the word itself is too long, split it
+            if len(word) > chars_per_line:
+                # Split long word across multiple lines
+                while len(word) > chars_per_line:
+                    lines.append(word[:chars_per_line])
+                    word = word[chars_per_line:]
+                current_line = word
+            else:
+                current_line = word
+    
+    # Add the last line if it has content
+    if current_line:
+        lines.append(current_line)
+    
+    return lines
+
+def draw_multiline_text_in_box(frame, text, box, avg_color):
+    """Draw multi-line text within the detection box boundaries - Fix for issue 1"""
+    x1, y1, x2, y2 = box
+    box_width = x2 - x1
+    box_height = y2 - y1
+    
+    # Text styling
+    font_scale = 0.8
+    thickness = 2
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    # Get text metrics
+    char_size = cv2.getTextSize("A", font, font_scale, thickness)[0]
+    line_height = char_size[1] + 6  # Add some line spacing
+    
+    # Wrap text to fit in box
+    lines = wrap_text_to_fit_box(text, box_width, font_scale, thickness)
+    
+    # Calculate total text height
+    total_text_height = len(lines) * line_height
+    
+    # Adjust font size if text doesn't fit vertically
+    if total_text_height > box_height - 16:  # 16px for top/bottom padding
+        # Reduce font scale to fit
+        scale_factor = (box_height - 16) / total_text_height
+        font_scale = max(0.4, font_scale * scale_factor)  # Minimum font scale
+        thickness = max(1, int(thickness * scale_factor))
+        
+        # Recalculate with new font size
+        char_size = cv2.getTextSize("A", font, font_scale, thickness)[0]
+        line_height = char_size[1] + 4
+        lines = wrap_text_to_fit_box(text, box_width, font_scale, thickness)
+        total_text_height = len(lines) * line_height
+    
+    # Draw background overlay
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), avg_color, -1)
+    frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+    
+    # Calculate starting position for centered text
+    start_y = y1 + max(8, (box_height - total_text_height) // 2) + line_height
+    
+    # Draw each line of text
+    for i, line in enumerate(lines):
+        if not line.strip():  # Skip empty lines
+            continue
+            
+        # Calculate y position for this line
+        text_y = start_y + (i * line_height)
+        
+        # Make sure we don't draw outside the box
+        if text_y > y2 - 8:
+            # Add "..." to indicate more text
+            if i > 0:  # Only if we've drawn at least one line
+                prev_y = start_y + ((i-1) * line_height)
+                cv2.putText(frame, "...", (x1 + 8, prev_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+            break
+        
+        # Calculate text width for centering (optional)
+        text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
+        text_x = x1 + 8  # Left align with padding
+        
+        # Draw text shadow for better readability
+        cv2.putText(frame, line, (text_x + 1, text_y + 1), font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
+        
+        # Draw main text
+        cv2.putText(frame, line, (text_x, text_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+    
+    return frame
 
 def find_working_hd60s_device():
     """Auto-detect working HD60 S+ device ID with enhanced detection"""
@@ -461,11 +604,11 @@ print("✓ Tracking initialized!")
 frame_q = queue.Queue(maxsize=150)  # Larger queue for CUDA
 ocr_q = queue.Queue(maxsize=150)
 ostates = {}            # tid -> {'box','start','pending'}
-overlay_states = {}     # tid -> {'box','text','avg'}
+overlay_states = {}     # tid -> {'box','text','avg', 'original_text'}
 active_tids = set()
 overlay_lock = threading.Lock()
 
-# CUDA-optimized detection thread
+# FIXED CUDA-optimized detection thread - Main fix for issue 2
 def detect_thread():
     print("🚀 CUDA Detection thread started")
     while True:
@@ -506,12 +649,26 @@ def detect_thread():
                 current.add(tid)
                 box = (int(x1),int(y1),int(x2),int(y2))
                 st = ostates.get(tid)
-                if st and np.linalg.norm(np.array(st['box'][:2]) - np.array(box[:2])) < 8:
-                    if now - st['start'] >= STABILITY_MS and not st['pending']:
-                        print(f"📦 Detected stable text box {tid} at {box}")
-                        ocr_q.put((tid, box, frame.copy()))
-                        st['pending'] = True
+                
+                # MAIN FIX FOR ISSUE 2: Fixed timer reset logic
+                if st:
+                    # Calculate position change
+                    position_change = np.linalg.norm(np.array(st['box'][:2]) - np.array(box[:2]))
+                    
+                    if position_change < 15:  # Increased tolerance for small movements
+                        # Small movement - keep existing timer, just update box position
+                        st['box'] = box  # Update position but preserve timer
+                        if now - st['start'] >= STABILITY_MS and not st['pending']:
+                            print(f"📦 Detected stable text box {tid} at {box} (stable for {(now - st['start']):.0f}ms)")
+                            ocr_q.put((tid, box, frame.copy()))
+                            st['pending'] = True
+                    else:
+                        # Large movement - likely new text, reset timer
+                        print(f"🔄 Text box {tid} moved significantly ({position_change:.1f}px) - resetting timer")
+                        ostates[tid] = {'box': box, 'start': now, 'pending': False}
                 else:
+                    # New track
+                    print(f"🆕 New text box {tid} detected at {box}")
                     ostates[tid] = {'box': box, 'start': now, 'pending': False}
             
             # update active tids
@@ -522,6 +679,8 @@ def detect_thread():
             # clean up ended tracks
             gone = set(ostates.keys()) - current
             for tid in gone:
+                if tid in ostates:
+                    print(f"🗑️ Removing ended track {tid}")
                 ostates.pop(tid, None)
                 
         except Exception as e:
@@ -529,7 +688,7 @@ def detect_thread():
             
         frame_q.task_done()
 
-# OCR & translation worker with CUDA optimization
+# ENHANCED OCR & translation worker - Fix for issue 2
 def ocr_worker(worker_id):
     print(f"🚀 CUDA OCR worker {worker_id} started")
     while True:
@@ -564,12 +723,32 @@ def ocr_worker(worker_id):
             print(f"📝 OCR box {tid}: '{txt}'")
             
             if txt:
+                # FIX FOR ISSUE 2: Check if we already have a similar translation for this track
+                with overlay_lock:
+                    existing_data = overlay_states.get(tid)
+                    if existing_data:
+                        # Calculate text similarity to avoid re-translating similar text
+                        existing_text = existing_data.get('original_text', '')
+                        similarity = calculate_text_similarity(txt, existing_text)
+                        
+                        if similarity > 0.85:  # 85% similar - reuse translation
+                            print(f"🔄 Text box {tid}: Similar text detected ({similarity:.2f}), reusing translation")
+                            existing_data['box'] = box  # Update box position
+                            ocr_q.task_done()
+                            continue
+                
                 # CUDA-accelerated translation
                 eng = get_translation(txt)
                 print(f"🌐 Translation box {tid}: '{txt}' -> '{eng}'")
                 avg = tuple(map(int, cv2.mean(roi)[:3]))
+                
                 with overlay_lock:
-                    overlay_states[tid] = {'box': box, 'text': eng, 'avg': avg}
+                    overlay_states[tid] = {
+                        'box': box, 
+                        'text': eng, 
+                        'avg': avg,
+                        'original_text': txt  # Store original text for similarity checking
+                    }
                     
         except Exception as e:
             print(f"❌ OCR/Translation error for box {tid}: {e}")
@@ -598,8 +777,6 @@ def enhanced_nintendo_switch_hud(frame, fps_disp, overlay_count, device):
         memory_used = torch.cuda.memory_allocated() / 1024**3
         cv2.putText(frame, f"GPU Memory: {memory_used:.1f}GB", (10,230),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,255), 2)
-    
-    # Removed the Nintendo Switch zone lines as requested
     
     return frame
 
@@ -658,29 +835,16 @@ def run():
                 if tid not in active_tids:
                     overlay_states.pop(tid, None)
                     
-        # draw overlays with better styling
+        # FIXED: draw overlays with multi-line text rendering - Fix for issue 1
         overlay_count = 0
         with overlay_lock:
             for tid, data in overlay_states.items():
                 x1,y1,x2,y2 = data['box']
                 avg = data['avg']
-                # Better overlay styling
-                overlay = frame.copy()
-                cv2.rectangle(overlay, (x1,y1), (x2,y2), avg, -1)
-                frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
-                
-                # Better text rendering
                 text = data['text']
-                font_scale = 0.8
-                thickness = 2
                 
-                # Text background for better readability
-                text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
-                cv2.rectangle(frame, (x1, y2-text_size[1]-8), (x1+text_size[0]+8, y2), (0,0,0), -1)
-                
-                cv2.putText(frame, text, (x1+4, y2-4),
-                            cv2.FONT_HERSHEY_SIMPLEX, font_scale,
-                            (255,255,255), thickness, cv2.LINE_AA)
+                # Use the new multi-line text rendering function
+                frame = draw_multiline_text_in_box(frame, text, (x1,y1,x2,y2), avg)
                 overlay_count += 1
                             
         # compute & display FPS
