@@ -1,9 +1,8 @@
 __pycache__/
 *.py[cod]
-
 # Virtual environment
 venv/
-
+venvCUDA/
 # Datasets
 data/
 
@@ -25,7 +24,7 @@ gpu_testing.py
 *.avi
 *.mp4
 *.mov
-
+*.whl
 packages/
 experiments/scratch/YOLOv11_nano/sort.py
 

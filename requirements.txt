@@ -7,3 +7,6 @@ opencv-python
 
 
 protobuf
+
+
+#GStreamer plugins ensure the G-API GStreamerPipeline class loads properly
