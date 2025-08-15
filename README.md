@@ -173,5 +173,17 @@ Relaunch your custom image:
 sudo docker run -it --rm --runtime nvidia \
   -v ~/Desktop/HDMIBabelfishV2:/workspace \
   -w /workspace \
-  hdmibabelfishv2docker
+  babelfishv2
 ```
+
+inside docker
+pip3 install sentencepiece
+
+
+
+sudo docker run -it --runtime=nvidia \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  --net=host \
+  -v ~/Desktop/HDMIBabelfishV2:/workspace \
+  babelfishv2
