@@ -1,3 +1,4 @@
-Requirement already satisfied: numpy==1.24.4 in /usr/local/lib/python3.8/dist-packages (1.24.4)
-Requirement already satisfied: opencv-python in /usr/local/lib/python3.8/dist-packages (4.12.0.88)
-Requirement already satisfied: protobuf in /usr/local/lib/python3.8/dist-packages (5.29.5)
+Collecting protobuf
+  Downloading protobuf-5.29.5-cp38-abi3-manylinux2014_aarch64.whl (319 kB)
+Installing collected packages: protobuf
+Successfully installed protobuf-5.29.5

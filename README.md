@@ -1,189 +1,80 @@
-Creating Venv:
+# 🎮 HDMIBabelfishV2 - Real-Time Japanese Game Translation
 
-python3 -m venv ~/venv
+[![Docker Hub](https://img.shields.io/badge/Docker-mahfuzur552%2Fbabelfishv2-blue?logo=docker)](https://hub.docker.com/r/mahfuzur552/babelfishv2)
+[![Platform](https://img.shields.io/badge/Platform-NVIDIA%20Jetson%20Orin-green?logo=nvidia)](https://developer.nvidia.com/embedded/jetson-orin)
 
-To activate:
+Real-time AI translation system for Japanese games on NVIDIA Jetson Orin devices.
 
-source venv/bin/activate
+## 🛠️ System Requirements
 
-Also:
+- **NVIDIA Jetson Orin NX 16GB**
+- **Docker** with NVIDIA Container Runtime
+- **Ubuntu 20.04** (JetPack 5.0+)
 
-pip install --upgrade pip wheel
+## 🚀 Quick Start
 
-Everytime it will auto open:
-
-echo 'source ~/Desktop/HDMIBabelfishV2/venv/bin/activate' >> ~/.bashrc
-
-For torch:
-
-https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048
-
-As, I am using python 3.8 so, I downloaded
-
-JetPack 5: PyTorch v2.1.0
-
-then:
-
-pip install  [torch file that you downloaded].whl
-
-
-pip install torchvision==0.16.0 torchaudio==2.1.0
-
-
-
-sudo apt update
-sudo apt install libopenblas-base libopenblas-dev
-
-to see the GPU is working or not
-
-python3 gpu_testing.py 
-
-pip install numpy matplotlib opencv-python
-
-
-pip install ultralytics
-
-
-sudo apt install tesseract-ocr libtesseract-dev
-sudo apt install tesseract-ocr-jpn
-pip install pytesseract
-
-
-pip install paddleocr
-pip install paddlepaddle -f https://www.paddlepaddle.org.cn/whl/linux/aarch64/paddle.html
-
-
-pip install transformers accelerate
-
-
-pip install sentencepiece
-
-
-sudo apt install libavcodec-extra
-
-pip install scikit-image
-
-pip install filterpy
-
-
-
-pip install googletrans==4.0.0rc1
-
-
-
-
-# HDMIBabelFishV2 Project Setup & Installation
-
-This README details the **step-by-step installation process** for setting up on Jetson Orin NX development environment using Docker and running your `HDMIBabelfishV2` project.
-
----
-
-## 1. Host Machine Preparation
-
-1. **Update package lists & install Docker**  
+### 1. Clone Repository
 ```bash
-sudo apt update
-sudo apt install docker.io -y
+git clone https://github.com/ThreeSwordAI/HDMIBabelfishV2.git
+cd HDMIBabelfishV2
 ```
 
-2. **Start & enable Docker service**
+### 2. Pull Docker Image
 ```bash
-sudo systemctl start docker
-sudo systemctl enable docker
+sudo docker pull mahfuzur552/babelfishv2:latest
 ```
 
-2. **Add your user to the docker group**
+### 3. Run Container
 ```bash
-sudo usermod -aG docker $USER
-```
-
-2. **Reboot to apply group changes**
-```bash
-sudo reboot
-```
-
-## 2. Pull & Run the NVIDIA Jetson-PyTorch Container
-2. **pull the Jetson-compatible PyTorch image**
-```bash
-sudo docker pull dustynv/l4t-pytorch:r35.3.1
-```
-
-2. **Run the container with your project folder mounted**
-```bash
-sudo docker run -it --rm --runtime nvidia \
-  -v ~/Desktop/HDMIBabelfishV2:/workspace \
-  -w /workspace \
-  dustynv/l4t-pytorch:r35.3.1
-```
-
--v: mounts your project at /workspace inside the container
--w: sets the working directory to /workspace
-
-## 3. Inside the Docker Container
-Once inside the container (root@...:/workspace):
-
-2. **Verify CUDA support**
-```bash
-python3 CUDA_test.py
-```
-
-2. **Install system dependencies**
-```bash
-apt-get update && apt-get install -y \
-  tesseract-ocr \
-  libxml2-dev libxslt1-dev \
-  python3-dev build-essential \
-  libsm6 libxext6 libgl1-mesa-glx ffmpeg
-```
-
-2. **Install required Python libraries**
-```bash
-pip install transformers \
-            ultralytics \
-            matplotlib \
-            pytesseract \
-            paddleocr \
-            scikit-image \
-            filterpy \
-            scikit-learn
-```
-
-Note: If paddleocr fails due to lxml, ensure libxml2-dev and libxslt1-dev are installed first.
-
-## 4. Run Your Scripts
-From /workspace/(proper folder):
-```bash
-python3 CUDA_test.py
-python3 CUDA_version_Testing.py
-python3 output_jetson.py
-```
-
-## 5. Save Your Custom Docker Image
-List running containers (to get the Container ID):
-
-```bash
-docker ps
-```
-Commit your configured container with a custom name:
-```bash
-docker commit [container-ID] hdmibabelfishv2docker
-```
-Relaunch your custom image:
-```bash
-sudo docker run -it --rm --runtime nvidia \
-  -v ~/Desktop/HDMIBabelfishV2:/workspace \
-  -w /workspace \
-  babelfishv2
-```
-
-inside docker
-pip3 install sentencepiece
-
-
-
 sudo docker run -it --runtime=nvidia \
   -e DISPLAY=$DISPLAY \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   --net=host \
-  -v ~/Desktop/HDMIBabelfishV2:/workspace \
-  babelfishv2
+  -v $(pwd):/workspace \
+  mahfuzur552/babelfishv2:latest
+```
+
+### 4. Test Setup
+```bash
+# Inside container
+cd /workspace/docker_setup
+
+# Test GPU
+python3 gpu_testing.py
+
+# Run translation pipeline
+python3 jetson_nintendo_optimized.py
+```
+
+## 🤖 Models Used
+
+- **YOLO**: YOLOv11 nano for text detection
+- **Translation**: Marian OPUS Japanese→English
+- **OCR**: pytesseract + PaddleOCR
+- **Tracking**: SORT algorithm
+
+## 📊 Performance
+
+- **Target Device**: Jetson Orin NX 16GB
+- **Current FPS**: 11.9 average
+- **GPU Usage**: 0.2GB (optimizable to 8GB+)
+- **Latency**: ~84ms
+
+## 🔧 Docker Commands
+
+```bash
+# Pull latest image
+sudo docker pull mahfuzur552/babelfishv2:latest
+
+# Run with GPU support
+sudo docker run -it --runtime=nvidia \
+  -v $(pwd):/workspace \
+  mahfuzur552/babelfishv2:latest
+
+# Save container changes
+sudo docker commit <container_id> babelfishv2_updated
+
+# Push to Docker Hub
+sudo docker tag babelfishv2_updated mahfuzur552/babelfishv2:latest
+sudo docker push mahfuzur552/babelfishv2:latest
+```

@@ -32,3 +32,5 @@ jetson/models/
 jetson/output/
 
 translation/models/
+
+docker_setup/yolo_output/
