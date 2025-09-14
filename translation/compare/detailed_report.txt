@@ -1,0 +1,146 @@
+================================================================================
+TRANSLATION MODELS COMPARISON REPORT
+================================================================================
+
+SUMMARY TABLE:
+--------------------------------------------------------------------------------
+            Model                                Description  Size (MB)  BLEU  ROUGE-L  Avg Time (s)  Throughput (texts/s)  Efficiency
+marian_opus_ja_en Marian OPUS Japanese-English (Fast, Small)      146.7  9.91    0.355        0.1087                  9.20        91.2
+    marian_jap_en        Marian Japanese-English Alternative      132.7  0.16    0.074        0.3299                  3.03         0.5
+        nllb_600m         NLLB 600M Distilled (High Quality)     1208.6  6.50    0.275        0.1811                  5.52        35.9
+         mt5_base                 mT5 Base (Multilingual T5)     1202.6  0.08    0.001        0.3349                  2.99         0.2
+
+DETAILED RESULTS:
+--------------------------------------------------------------------------------
+
+MARIAN_OPUS_JA_EN:
+Description: Marian OPUS Japanese-English (Fast, Small)
+Model Size: 146.7 MB
+Quality Metrics:
+  - BLEU Score: 9.91
+  - ROUGE-1: 0.370
+  - ROUGE-2: 0.182
+  - ROUGE-L: 0.355
+Performance Metrics:
+  - Avg Translation Time: 0.1087s
+  - Total Time: 213.86s
+  - Throughput: 9.20 texts/sec
+Sample Translations:
+  1. JP: ゲイル 酔ってる?
+     REF: gail, are you drunk?
+     PRED: Gail, are you drunk?
+     TIME: 5.1074s
+
+  2. JP: 注意しろ
+     REF: be careful.
+     PRED: Be careful.
+     TIME: 0.0631s
+
+  3. JP: 最後の引き出しが 5日前にあった
+     REF: last withdrawal was five days ago.
+     PRED: The last drawer was found five days ago.
+     TIME: 0.0872s
+
+--------------------------------------------------
+
+MARIAN_JAP_EN:
+Description: Marian Japanese-English Alternative
+Model Size: 132.7 MB
+Quality Metrics:
+  - BLEU Score: 0.16
+  - ROUGE-1: 0.080
+  - ROUGE-2: 0.008
+  - ROUGE-L: 0.074
+Performance Metrics:
+  - Avg Translation Time: 0.3299s
+  - Total Time: 649.29s
+  - Throughput: 3.03 texts/sec
+Sample Translations:
+  1. JP: ゲイル 酔ってる?
+     REF: gail, are you drunk?
+     PRED: And I went into Joppa, and was drunken.
+     TIME: 0.2521s
+
+  2. JP: 注意しろ
+     REF: be careful.
+     PRED: Being grieved.
+     TIME: 0.0524s
+
+  3. JP: 最後の引き出しが 5日前にあった
+     REF: last withdrawal was five days ago.
+     PRED: The last day after John had been brought out, and after John's younger Edom should be brought out,
+     TIME: 0.2059s
+
+--------------------------------------------------
+
+NLLB_600M:
+Description: NLLB 600M Distilled (High Quality)
+Model Size: 1208.6 MB
+Quality Metrics:
+  - BLEU Score: 6.50
+  - ROUGE-1: 0.292
+  - ROUGE-2: 0.119
+  - ROUGE-L: 0.275
+Performance Metrics:
+  - Avg Translation Time: 0.1811s
+  - Total Time: 356.54s
+  - Throughput: 5.52 texts/sec
+Sample Translations:
+  1. JP: ゲイル 酔ってる?
+     REF: gail, are you drunk?
+     PRED: Is Gail drunk?
+     TIME: 0.7905s
+
+  2. JP: 注意しろ
+     REF: be careful.
+     PRED: Be careful .
+     TIME: 0.0973s
+
+  3. JP: 最後の引き出しが 5日前にあった
+     REF: last withdrawal was five days ago.
+     PRED: The last drawing was five days ago.
+     TIME: 0.1520s
+
+--------------------------------------------------
+
+MT5_BASE:
+Description: mT5 Base (Multilingual T5)
+Model Size: 1202.6 MB
+Quality Metrics:
+  - BLEU Score: 0.08
+  - ROUGE-1: 0.001
+  - ROUGE-2: 0.000
+  - ROUGE-L: 0.001
+Performance Metrics:
+  - Avg Translation Time: 0.3349s
+  - Total Time: 659.03s
+  - Throughput: 2.99 texts/sec
+Sample Translations:
+  1. JP: ゲイル 酔ってる?
+     REF: gail, are you drunk?
+     PRED: <extra_id_0> ?
+     TIME: 2.3330s
+
+  2. JP: 注意しろ
+     REF: be careful.
+     PRED: <extra_id_0>。 <extra_id_1>  <extra_id_2>  <extra_id_3>  <extra_id_4>  <extra_id_5> 注意 注意 <extra_id_6>  <extra_id_7> 注意 注意 <extra_id_8> 注意 <extra_id_9> 注意 <extra_id_10> 注意 <extra_id_11>  <extra_id_12> 注意    注意  <extra_id_52> 
+     TIME: 1.6296s
+
+  3. JP: 最後の引き出しが 5日前にあった
+     REF: last withdrawal was five days ago.
+     PRED: <extra_id_0>。 <extra_id_1>  <extra_id_2> 最後の引き出し
+     TIME: 0.2521s
+
+--------------------------------------------------
+
+RECOMMENDATIONS:
+--------------------------------------------------------------------------------
+Best Quality: marian_opus_ja_en (BLEU: 9.91)
+Fastest Speed: marian_opus_ja_en (Time: 0.1087s)
+Best Efficiency: marian_opus_ja_en (Efficiency: 91.2)
+Smallest Model: marian_jap_en (Size: 132.7 MB)
+
+For Real-time Gaming Applications:
+- Recommended: marian_opus_ja_en (Best balance of quality and speed)
+- Alternative: marian_opus_ja_en (If speed is critical)
+- High-quality: marian_opus_ja_en (If quality is more important than speed)

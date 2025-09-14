@@ -1,0 +1,57 @@
+[
+  {
+    "model_key": "nllb_600m",
+    "description": "NLLB 600M (High Quality)",
+    "model_size_mb": 1208.635799407959,
+    "avg_time": 0.22696729016497852,
+    "color": "#2ecc71",
+    "bleu": 9.535006837647638,
+    "chrf": 29.86405143951573,
+    "comet": 0.6785398804529653,
+    "meteor": 0.2238988821733995
+  },
+  {
+    "model_key": "marian_opus_ja_en",
+    "description": "Marian OPUS (Base)",
+    "model_size_mb": 146.74213409423828,
+    "avg_time": 0.11575573513178321,
+    "color": "#3498db",
+    "bleu": 9.91345277992914,
+    "chrf": 28.93112597993178,
+    "comet": 0.6747647613983571,
+    "meteor": 0.23264418716830904
+  },
+  {
+    "model_key": "marian_opus_ja_en_finetuned",
+    "description": "Marian OPUS (Fine-Tuned)",
+    "model_size_mb": 2019.4087524414062,
+    "avg_time": 0.1130535900592804,
+    "color": "#e74c3c",
+    "bleu": 14.508740886911626,
+    "chrf": 33.50524842464367,
+    "comet": 0.7038093681288201,
+    "meteor": 0.24788898492543163
+  },
+  {
+    "model_key": "marian_jap_en",
+    "description": "Marian OPUS (Legacy)",
+    "model_size_mb": 132.65553092956543,
+    "avg_time": 0.3339472711086273,
+    "color": "#95a5a6",
+    "bleu": 0.14207196838992536,
+    "chrf": 12.255682048224912,
+    "comet": 0.38939153893691736,
+    "meteor": 0.05688681925806919
+  },
+  {
+    "model_key": "mt5_base",
+    "description": "mT5 Base",
+    "model_size_mb": 1202.597617149353,
+    "avg_time": 0.18646024603669237,
+    "color": "#1abc9c",
+    "bleu": 0.08630504407468839,
+    "chrf": 6.153999443626226,
+    "comet": 0.3523252117258262,
+    "meteor": 0.0040929455633303274
+  }
+]
