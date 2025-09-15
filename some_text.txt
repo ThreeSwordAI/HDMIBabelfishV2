@@ -196,3 +196,36 @@ sudo docker run -it --runtime=nvidia \
   --net=host \
   -v ~/Desktop/HDMIBabelfishV2:/workspace \
   babelfishv2
+
+
+
+
+
+
+
+  ==================15 Sep======================
+
+  sudo docker run -it --runtime=nvidia \
+  -e DISPLAY=$DISPLAY \
+  -e QT_X11_NO_MITSHM=1 \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  --net=host \
+  --privileged \
+  -v $(pwd):/workspace \
+  babelfishv2
+
+
+ls -la /dev/video*
+
+
+xhost +local:docker
+
+  sudo docker run -it --runtime=nvidia \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  --net=host \
+  -v $(pwd):/workspace \
+  --device=/dev/video0:/dev/video0 \
+  --device=/dev/video1:/dev/video1 \
+  --privileged \
+  mahfuzur552/babelfishv2:latest
