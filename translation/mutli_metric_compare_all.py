@@ -68,14 +68,23 @@ TRANSLATION_MODELS = {
         "description": "Marian OPUS (Base)",
         "color": "#3498db"
     },
-    "marian_opus_ja_en_finetuned": {
+    "marian_opus_ft_ja_en_100K_Data": {
         "model_name": "Helsinki-NLP/opus-mt-ja-en",
-        "local_path": MODELS_DIR / "marian_opus_ja_en_finetuned",
+        "local_path": MODELS_DIR / "marian_opus_ft_ja_en_100K_Data",
         "tokenizer_class": MarianTokenizer,
         "model_class": MarianMTModel,
         "type": "marian",
-        "description": "Marian OPUS (Fine-Tuned)",
+        "description": "Marian OPUS (Fine-Tuned Small)",
         "color": "#e74c3c"
+    },
+    "marian_opus_ft_ja_en_full_dataset": {
+        "model_name": "Helsinki-NLP/opus-mt-ja-en",
+        "local_path": MODELS_DIR / "marian_opus_ft_ja_en_full_dataset",
+        "tokenizer_class": MarianTokenizer,
+        "model_class": MarianMTModel,
+        "type": "marian",
+        "description": "Marian OPUS (Fine-Tuned Large)",
+        "color": "#e67e22"
     },
     "marian_jap_en": {
         "model_name": "Helsinki-NLP/opus-mt-jap-en",
