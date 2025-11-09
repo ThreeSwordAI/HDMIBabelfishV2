@@ -1,0 +1,6 @@
+Metric,Description,Value / Comment
+Average FPS,Throughput during tracking-only test,~36 FPS
+Avg. ID Switches per 1000 frames,Reassignment of bounding box IDs,< 5
+Avg. Track Lifetime,Mean persistence of text box ID,8.9–3.4 s
+Stability Trigger Threshold,Heuristic delay before OCR call,200 ms
+Reduction in OCR Calls,Compared to per-frame OCR,≈ 12% fewer

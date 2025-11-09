@@ -36,3 +36,5 @@ translation/models/
 docker_setup/yolo_output/
 
 pipeline/models/
+
+result_visualization/models/

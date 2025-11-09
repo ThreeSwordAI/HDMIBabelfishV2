@@ -1,0 +1,23 @@
+{
+  "tracking_performance": {
+    "average_fps": 36.00749856227277,
+    "min_fps": 1.2854433630694433,
+    "max_fps": 138.33912727992347
+  },
+  "temporal_stability": {
+    "total_id_switches": 24,
+    "id_switches_per_1000_frames": 4.740272565672527,
+    "average_track_lifetime_seconds": 8.851988307765273,
+    "median_track_lifetime_seconds": 3.444523811340332,
+    "unique_tracks": 61
+  },
+  "stability_heuristic": {
+    "threshold_ms": 200,
+    "stable_boxes": 63,
+    "unstable_boxes": 9,
+    "ocr_reduction_percentage": 12.5
+  },
+  "dataset_info": {
+    "total_frames": 5063
+  }
+}
