@@ -38,3 +38,7 @@ docker_setup/yolo_output/
 pipeline/models/
 
 result_visualization/models/
+
+pipeline/results/jetson_video/for_presentation/
+
+docker_setup/yolo_output/for_presentation/
